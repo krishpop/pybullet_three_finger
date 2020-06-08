@@ -1,0 +1,274 @@
+<?xml version="1.0"?>
+<!-- =================================================================================== -->
+<!-- |    Three fingers manipulator with 6 links, sphere tip (loaded mesh), with pole and target pose			   | -->
+<!-- =================================================================================== -->
+<robot name="3FingersRobot" xmlns:xacro="http://www.ros.org/wiki.xacro">
+	<xacro:property name="base_w" value="0.6"/>
+	<xacro:property name="base_h" value="0.4"/>
+	<xacro:property name="base_t" value="0.02"/>
+
+	<xacro:property name="f1_x" value="0"/>
+	<xacro:property name="f1_y" value="0.2"/>
+	<xacro:property name="f2_x" value="-0.1"/>
+	<xacro:property name="f2_y" value="-0.2"/>
+	<xacro:property name="f3_x" value="0.1"/>
+	<xacro:property name="f3_y" value="-0.2"/>
+
+	<xacro:property name="l1" value="0.15"/>
+	<xacro:property name="l2" value="0.1"/>
+	<xacro:property name="l_w" value="0.02"/>
+	<xacro:property name="l_t" value="0.005"/>
+	<xacro:property name="m1" value="0.5"/>
+	<xacro:property name="m2" value="0.5"/>
+
+	<xacro:property name="pole_len" value="0.5"/>
+	<xacro:property name="pole_width" value="0.02"/>
+	<xacro:property name="pole_thick" value="0.005"/>
+    <xacro:property name="pole_mass" value="0.5" />
+
+	<material name="white">
+		<color rgba="0.8 0.8 0.8 1"/>
+	</material>
+
+	<material name="blue">
+		<color rgba="0 0 0.8 1"/>
+	</material>
+
+	<material name="green">
+		<color rgba="0 0.8 0 1"/>
+	</material>
+	<material name="green_target">
+		<color rgba="0 0.8 0 0.5"/>
+	</material>
+
+	<xacro:macro name="default_inertial" params="mass">
+		<inertial>
+			<mass value="${mass}"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</xacro:macro>
+
+	<link name="base">
+		<visual>
+			<geometry>
+				<box size="${base_w} ${base_h} ${base_t}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+			<material name="white" />
+		</visual>
+		<collision>
+			<geometry>
+				<box size="${base_w} ${base_h} ${base_t}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+		</collision>
+		<xacro:default_inertial mass="0"/>
+	</link>
+
+	<xacro:macro name="finger" params="prefix x y theta">
+        <link name="${prefix}_proximal_link">
+            <visual>
+				<geometry>
+                    <cylinder radius="${l_w/2.0*1.1}" length="0.02"/>
+                </geometry>
+                <origin xyz="0 0 0"/>
+			</visual>
+            <visual>
+				<geometry>
+                    <box size="${l1} ${l_w} ${l_t}"/>
+                </geometry>
+                <origin xyz="${l1/2.0} 0 0"/>
+			</visual>
+			<collision>
+				<geometry>
+                    <box size="${l1} ${l_w} ${l_t}"/>
+                </geometry>
+                <origin xyz="${l1/2.0} 0 0"/>
+			</collision>
+		    <inertial>
+                <origin xyz="${l1/2.0} 0 0" />
+                <mass value="${m1}" />
+                <inertia
+						ixx="${1/12.0*m1*(l_w*l_w+l_t*l_t)}"
+						iyy="${1/12.0*m1*(l1*l1+l_t*l_t)}"
+						izz="${1/12.0*m1*(l1*l1+l_w*l_w)}"
+                    	ixy="0" iyz="0" ixz="0"/>
+            </inertial>
+		</link>
+
+		<joint name="${prefix}_base_joint" type="revolute">
+			<parent link="base"/>
+			<child link="${prefix}_proximal_link" />
+            <origin xyz="${x} ${y} 0.02" rpy="0 0 ${theta}"/>
+            <axis xyz="0 0 1"/>
+	        <limit effort="10000.0" lower="-3.14" upper="3.14"  velocity="5"/>
+	        <dynamics damping="0" friction="0"/>
+		</joint>
+    
+        <link name="${prefix}_distal_link">
+            <visual>
+				<geometry>
+					<box size="${l2-l_w/2.0} ${l_w} ${l_t}"/>
+				</geometry>
+                <origin xyz="${(l2-l_w/2.0)/2.0} 0 0"/>
+                <material name="green"/>
+			</visual>
+           <visual name="${prefix}_fingertip">
+				<geometry>
+                	<mesh filename="./cylinder.dae" scale="0.01 0.01 0.01"/> 
+                </geometry>
+                <origin xyz="${l2 - l_w/2.0} 0 0"/>
+                <material name="blue"/>
+			</visual>
+			<collision>
+				<geometry>
+                	<mesh filename="./cylinder.dae" scale="0.01 0.01 0.01"/> 
+                </geometry>
+                <origin xyz="${l2 - l_w/2.0} 0 0"/>
+			</collision>
+			<collision>
+				<geometry>
+					<box size="${l2-l_w/2.0} ${l_w} ${l_t}"/>
+				</geometry>
+                <origin xyz="${(l2-l_w/2.0)/2.0} 0 0"/>
+			</collision>
+            <inertial>
+                <origin xyz="${l2/2.0} 0 0" />
+                <mass value="${m2}" />
+                <inertia
+						ixx="${1/12.0*m2*(l_w*l_w+l_w*l_w)}"
+						iyy="${1/12.0*m2*(l2*l2+l_w*l_w)}"
+						izz="${1/12.0*m2*(l2*l2+l_w*l_w)}"
+                    	ixy="0" iyz="0" ixz="0"/>
+            </inertial>
+		</link>
+
+        <joint name="${prefix}_central_joint" type="revolute">
+            <parent link="${prefix}_proximal_link"/>
+			<child link="${prefix}_distal_link" />
+            <origin xyz="${l1} 0 0"/>
+            <axis xyz="0 0 1"/>
+	        <limit effort="10000.0" lower="-3.14" upper="3.14"  velocity="5"/>
+	        <dynamics damping="0" friction="0"/>
+		</joint>
+       	</xacro:macro>
+
+	<xacro:finger prefix="1" x="${f1_x}" y="${f1_y}" theta="3.1415/2.0"/>
+	<xacro:finger prefix="2" x="${f2_x}" y="${f2_y}" theta="0"/>
+	<xacro:finger prefix="3" x="${f3_x}" y="${f3_y}" theta="0"/>
+
+	<!-- dummy link for 2D constraints -->
+	<link name="object_dummy_link_1">
+		<inertial>
+			<mass value="0"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</link>
+	<link name="object_dummy_link_2">
+		<inertial>
+			<mass value="0"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</link>
+	<link name="object_pole">
+		<visual>
+			<geometry>
+				<box size="${pole_len} ${pole_width} ${pole_thick}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+		</visual>
+		<collision>
+			<geometry>
+				<box size="${pole_len} ${pole_width} ${pole_thick}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+		</collision>
+        <inertial>
+            <origin xyz="0 0 0"/>
+            <mass value="${pole_mass}" />
+            <inertia ixx="${1/12.0 * pole_mass * (pole_width*pole_width + pole_thick*pole_thick)}"
+                iyy="${1/12.0 * pole_mass * (pole_len*pole_len + pole_thick*pole_thick)}" 
+                izz="${1/12.0 * pole_mass * (pole_len*pole_len + pole_width*pole_width)}"
+                ixy="0" ixz="0" iyz="0" /> 
+        </inertial>
+	</link>
+	<joint name="object_base_pole_x" type="prismatic">
+		<parent link="base"/>
+		<child link="object_dummy_link_1"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="1 0 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit effort="10000.0" lower="-100" upper="100" velocity="5"/>
+	</joint>
+	<joint name="object_base_pole_y" type="prismatic">
+		<parent link="object_dummy_link_1"/>
+		<child link="object_dummy_link_2"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="0 1 0"/>
+        <limit effort="10000.0" lower="-100" upper="100" velocity="5"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+	<joint name="object_base_pole_theta" type="revolute">
+		<parent link="object_dummy_link_2"/>
+		<child link="object_pole"/>
+		<origin xyz="0 0 0.02"/>
+		<axis xyz="0 0 1"/>
+        <limit effort="10000.0" lower="-3.14" upper="3.14" velocity="5"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+
+	<link name="target_dummy_link_1">
+		<inertial>
+			<mass value="0"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</link>
+	<link name="target_dummy_link_2">
+		<inertial>
+			<mass value="0"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</link>
+	<link name="target_pole">
+		<visual>
+			<geometry>
+				<box size="${pole_len} ${pole_width} ${pole_thick}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+			<material name="green_target"/>
+		</visual>
+        <inertial>
+            <origin xyz="0 0 0"/>
+            <mass value="${pole_mass}" />
+            <inertia ixx="${1/12.0 * pole_mass * (pole_width*pole_width + pole_thick*pole_thick)}"
+                iyy="${1/12.0 * pole_mass * (pole_len*pole_len + pole_thick*pole_thick)}" 
+                izz="${1/12.0 * pole_mass * (pole_len*pole_len + pole_width*pole_width)}"
+                ixy="0" ixz="0" iyz="0" /> 
+        </inertial>
+	</link>
+	<joint name="target_base_pole_x" type="prismatic">
+		<parent link="base"/>
+		<child link="target_dummy_link_1"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="1 0 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit effort="10000.0" lower="-100" upper="100" velocity="5"/>
+	</joint>
+	<joint name="target_base_pole_y" type="prismatic">
+		<parent link="target_dummy_link_1"/>
+		<child link="target_dummy_link_2"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="0 1 0"/>
+        <limit effort="10000.0" lower="-100" upper="100" velocity="5"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+	<joint name="target_base_pole_theta" type="revolute">
+		<parent link="target_dummy_link_2"/>
+		<child link="target_pole"/>
+		<origin xyz="0 0 0.02"/>
+		<axis xyz="0 0 1"/>
+        <limit effort="10000.0" lower="-3.14" upper="3.14" velocity="5"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+
+</robot>

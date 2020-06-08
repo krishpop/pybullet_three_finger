@@ -1,0 +1,70 @@
+<?xml version="1.0" ?>
+<!-- =================================================================================== -->
+<!-- |    One link manipulator with 1 DoF, rectangular tip                             | -->
+<!-- =================================================================================== -->
+<robot name="3FingersRobot" xmlns:xacro="http://www.ros.org/wiki.xacro">
+  <material name="white">
+    <color rgba="0.8 0.8 0.8 1"/>
+  </material>
+  <material name="blue">
+    <color rgba="0 0 0.8 1"/>
+  </material>
+  <material name="green">
+    <color rgba="0 0.8 0 1"/>
+  </material>
+
+  <link name="base_link">
+    <visual>
+      <geometry>
+        <cylinder length="0.05" radius="0.075"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0 0.025"/>
+      <material name="white"/>
+    </visual>
+
+    <collision>
+      <geometry>
+        <cylinder length="0.05" radius="0.075"/>
+      </geometry>
+      <origin rpy="0 0 0" xyz="0 0 0 0.025"/>
+    </collision>
+
+    <inertial>
+      <mass value="0.2"/>
+      <inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+    </inertial>
+  </link>
+
+  <link name="link_1">
+    <visual>
+        <geometry>
+            <box size="1.0 0.1 0.05"/>
+        </geometry>
+        <origin rpy="0 0 0" xyz="0.5 0 0"/>
+        <material name="blue"/>
+    </visual>
+
+    <collision>
+        <geometry>
+            <box size="1.0 0.1 0.05"/>
+        </geometry>
+        <origin rpy="0 0 0" xyz="0.5 0 0"/>
+    </collision>
+
+    <inertial>
+        <origin xyz="0.5 0 0"/>
+        <mass value="0.5"/>
+        <inertia ixx="1" iyy="1" izz="2" ixy="0" ixz="0" iyz="0"/>
+    </inertial>
+  </link>
+
+  <joint name="joint_1" type="revolute">
+    <parent link="base_link"/>
+    <child link="link_1"/>
+    <origin xyz="0 0 0.075" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="10000" lower="-3.14" upper="3.14" velocity="5"/>
+    <dynamics damping="0" friction="0"/>
+  </joint>
+</robot>
+

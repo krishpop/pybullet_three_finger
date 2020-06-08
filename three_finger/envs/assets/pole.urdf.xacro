@@ -1,0 +1,136 @@
+<?xml version="1.0"?>
+<robot name="3FingersRobot" xmlns:xacro="http://www.ros.org/wiki.xacro">
+	<xacro:property name="pole_len" value="0.5"/>
+	<xacro:property name="pole_width" value="0.02"/>
+	<xacro:property name="pole_thick" value="0.005"/>
+	<xacro:property name="ground_len" value="1.0" />
+	<xacro:property name="ground_thick" value="0.01" />
+	<xacro:property name="dist_contact_pts" value="0.15" />
+    <xacro:property name="pole_mass" value="0.5" />
+
+	<material name="white">
+		<color rgba="0.8 0.8 0.8 1"/>
+	</material>
+
+	<material name="blue">
+		<color rgba="0 0 0.8 1"/>
+	</material>
+
+	<material name="green">
+		<color rgba="0 0.8 0 1"/>
+	</material>
+
+	<xacro:macro name="default_inertial" params="mass">
+		<inertial>
+			<mass value="${mass}"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</xacro:macro>
+
+	<link name="base_link">
+		<xacro:default_inertial mass="0"/>
+	</link>
+
+	<!-- dummy link for 2D constraints -->
+	<link name="dummy_link_1">
+		<inertial>
+			<mass value="0"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</link>
+	<link name="dummy_link_2">
+		<inertial>
+			<mass value="0"/>
+			<inertia ixx="1e-3" ixy="0.0" ixz="0.0" iyy="1e-3" iyz="0.0" izz="1e-3"/>
+		</inertial>
+	</link>
+	<link name="target_pole">
+		<visual>
+			<geometry>
+				<box size="${pole_len} ${pole_width} ${pole_thick}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+		</visual>
+		<collision>
+			<geometry>
+				<box size="${pole_len} ${pole_width} ${pole_thick}"/>
+			</geometry>
+			<origin xyz="0 0 0"/>
+		</collision>
+        <inertial>
+            <origin xyz="0 0 0"/>
+            <mass value="${pole_mass}" />
+            <inertia ixx="${1/12.0 * pole_mass * (pole_width*pole_width + pole_thick*pole_thick)}"
+                iyy="${1/12.0 * pole_mass * (pole_len*pole_len + pole_thick*pole_thick)}" 
+                izz="${1/12.0 * pole_mass * (pole_len*pole_len + pole_width*pole_width)}"
+                ixy="0" ixz="0" iyz="0" /> 
+        </inertial>
+	</link>
+	<joint name="base_link_prismatic1" type="prismatic">
+		<parent link="base_link"/>
+		<child link="dummy_link_1"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="1 0 0"/>
+        <dynamics damping="0" friction="0"/>
+        <limit effort="10000.0" lower="-100" upper="100" velocity="5"/>
+	</joint>
+	<joint name="base_link_prismatic2" type="prismatic">
+		<parent link="dummy_link_1"/>
+		<child link="dummy_link_2"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="0 1 0"/>
+        <limit effort="10000.0" lower="-100" upper="100" velocity="5"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+	<joint name="base_link_revolute" type="revolute">
+		<parent link="dummy_link_2"/>
+		<child link="target_pole"/>
+		<origin xyz="0 0 0"/>
+		<axis xyz="0 0 1"/>
+        <limit effort="10000.0" lower="-3.14" upper="3.14" velocity="5"/>
+        <dynamics damping="0" friction="0"/>
+	</joint>
+
+	<!--<link name="contact_point_1">-->
+		<!--<visual>-->
+			<!--<geometry>-->
+				<!--<sphere radius="${pole_thick*0.5}"/>-->
+			<!--</geometry>-->
+			<!--<material name="blue" />-->
+		<!--</visual>-->
+	<!--</link>-->
+	<!--<link name="contact_point_2">-->
+		<!--<visual>-->
+			<!--<geometry>-->
+				<!--<sphere radius="${pole_thick*0.5}"/>-->
+			<!--</geometry>-->
+			<!--<material name="blue" />-->
+		<!--</visual>-->
+	<!--</link>-->
+	<!--<link name="contact_point_3">-->
+		<!--<visual>-->
+			<!--<geometry>-->
+				<!--<sphere radius="${pole_thick*0.5}"/>-->
+			<!--</geometry>-->
+			<!--<material name="blue" />-->
+		<!--</visual>-->
+	<!--</link>-->
+
+	<!--<joint name="contact_point_1_joint" type='fixed'>-->
+		<!--<parent link="target_pole"/>-->
+		<!--<child link="contact_point_1"/>-->
+		<!--<origin xyz="0 0 0.02" />-->
+	<!--</joint>-->
+
+	<!--<joint name="contact_point_2_joint" type='fixed'>-->
+		<!--<parent link="target_pole"/>-->
+		<!--<child link="contact_point_2"/>-->
+		<!--<origin xyz="${-dist_contact_pts} 0 0.02" />-->
+	<!--</joint>	-->
+
+	<!--<joint name="contact_point_3_joint" type='fixed'>-->
+		<!--<parent link="target_pole"/>-->
+		<!--<child link="contact_point_3"/>-->
+		<!--<origin xyz="${dist_contact_pts} 0 0.02" />-->
+	<!--</joint>-->
+</robot>
