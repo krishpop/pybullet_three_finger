@@ -215,7 +215,8 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
                  orientation_threshold=ORI_THRESH, goal_range=GOAL_RANGE,
                  rew_min_clip=REW_MIN_CLIP,
                  reset_on_drop=False, steps_from_drop=20, goal_difficulty='easy',
-                 drop_penalty=-500, ac_penalty=-10, ac_hist_len=0):
+                 drop_penalty=-500, ac_penalty=-10, ac_hist_len=0,
+                 use_contacts=False):
         self.set_goal_difficulty(goal_difficulty)
         self.robot = ThreeFingerRobot()
         self.reward_type = reward_type
@@ -228,17 +229,19 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
         self.steps_from_drop = steps_from_drop
         self.drop_penalty = drop_penalty / steps_from_drop
         self.ac_penalty = ac_penalty
-        super().__init__(self.robot, render=render)
         self.ac_hist_len = ac_hist_len
+        self.goal_contacts = None
+        self.use_contacts = use_contacts
+        super().__init__(self.robot, render=render)
         if ac_hist_len:
             ac_space_low = self.action_space.low
             ob_space_low = self.observation_space.low
             ob_ac_space = np.concatenate([ob_space_low] + 
-                                         [ac_space_low]*ac_hist_steps)
+                                         [ac_space_low]*ac_hist_len)
             self.observation_space = spaces.Box(low=ob_ac_space,
                                                 high=-ob_ac_space)
         self.info = dict(pos_success=False, ori_success=False, dropped=False,
-                         is_success=False)
+                         is_success=False, lost_contact=False)
         self._cam_dist = 1
         self._render_width = 640
         self._render_height = 480
@@ -255,14 +258,18 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
 
     @property
     def goal(self):
-        return self.robot.goal
+        if not self.use_contacts:
+            return self.robot.goal
+        g = self.robot.goal
+        cp = self.goal_contacts
+        return np.concatenate([g, cp])
     
     def create_single_player_scene(self, bullet_client):
         return SingleRobotEmptyScene(bullet_client, gravity=0.0, timestep=0.0165, frame_skip=1)
 
     def step(self, a):
         if self.current_step == self.max_episode_steps or self.done:
-            logger.warn('Gripper2DSamplePoseEnv.step: Reached end of episode, need to call env.reset()')
+            #logger.warn('Gripper2DSamplePoseEnv.step: Reached end of episode, need to call env.reset()')
             state = self.robot.calc_state()
             if self.ac_hist_len:
                 ac = self.robot.ac_hist[-self.ac_hist_len:]
@@ -285,21 +292,26 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
         return state, reward, self.done, self.info
 
     def calc_done(self, achieved_goal, desired_goal):
-        x_dist, y_dist, theta_dist = achieved_goal - desired_goal
+        if not self.use_contacts:
+            x_dist, y_dist, theta_dist = achieved_goal - desired_goal
+        else:
+            x_dist, y_dist, theta_dist, c1_dist, c2_dist, c3_dist = achieved_goal - desired_goal
         info = {}
         done = self.done  # does not change status of done
         info['pos_success'] = np.linalg.norm([x_dist, y_dist]) < self.distance_threshold
         info['ori_success'] = (np.abs(theta_dist) < self.orientation_threshold) 
         info['dropped'] = info['is_success'] = False
+        info['lost_contact'] = False
         if info['pos_success'] and info['ori_success']:
             done = True
             info['is_success'] = True
             info['dropped'] = False
         else:
             cp = self.robot.get_contact_pts() 
-            if cp[0] is None or (cp[1] is None and cp[2] is None):
+            if None in cp:
                 if self.drop_step is None:
                     self.drop_step = self.current_step
+                    info['lost_contact'] = True
                 elif self.current_step - self.drop_step >= self.steps_from_drop:
                     done = True if self.reset_on_drop else done
                     info['dropped'] = True
@@ -309,11 +321,15 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
         return done, info
 
     def compute_reward(self, achieved_goal, desired_goal, info={}):
-        last_ac = self.robot.ac_hist[-1]
-        x_dist, y_dist, theta_dist = desired_goal - achieved_goal
+        desired_goal, achieved_goal = desired_goal.flatten(), achieved_goal.flatten()
+        if not self.use_contacts:
+            assert len(desired_goal) == len(achieved_goal) == 3, 'got wrong shape: {}'.format(desired_goal.shape)
+        else:
+            assert len(desired_goal) == len(achieved_goal) == 6, 'got wrong shape: {}'.format(desired_goal.shape)
+
         reward = 0
         done, i = self.done, self.info 
-        if i.get('dropped', False):
+        if i.get('dropped', False) or i.get('lost_contact', False):
             reward = self.drop_penalty
         elif self.reward_type == 'sparse' or info.get('reward_type') == 'sparse':
             # calculate sparse reward
@@ -332,7 +348,6 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
                 reward += 3  # more reward for reaching orientation goal than pos goal
             else:
                 reward -=  10 * np.abs(theta_dist)
-            reward += self.ac_penalty * np.linalg.norm(last_ac)
 
         if self.reward_type == 'contacts':
             cp = self.robot.get_contact_pts()
@@ -428,7 +443,8 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
         self.frame = 0
         self.done = False
         self.current_step = 0
-        self.info = dict(pos_success=False, ori_success=False, dropped=False, is_success=False)
+        self.info = dict(pos_success=False, ori_success=False, dropped=False,
+                is_success=False, lost_contact=False)
         self.drop_step = None
         self.reward = 0
         dump = 0
@@ -458,7 +474,7 @@ class Gripper2DSamplePoseEnv(MJCFBaseBulletEnv):
                     init_file_path, init_mode)
             self.info_init_object_pos = self.robot.object_pos.copy()
             if self._goal_difficulty != 'easy': init_file = None 
-            self.robot.target_pos, _, _ = self._sample_pose(
+            self.robot.target_pos, _, self.goal_contacts = self._sample_pose(
                     goal_file_path, goal_mode, init_file)
             self.info_target_pos = self.robot.target_pos.copy() 
             for i in range(len(self.robot.object_pos)):
@@ -624,6 +640,13 @@ class Gripper2DGoalEnv(GoalEnv):
         return obs_dict
 
     def compute_reward(self, achieved_goal, desired_goal, info={}):
+        if len(achieved_goal.shape) == 2:
+            rews = []
+            for i in range(achieved_goal.shape[0]):
+                info_i = {k:info[k][i] for k in info} if info else {}
+                rews.append(self.env.compute_reward(achieved_goal[i],
+                    desired_goal[i], info_i))
+            return np.array(rews)
         return self.env.compute_reward(achieved_goal, desired_goal, info)
 
     @property

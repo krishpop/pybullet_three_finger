@@ -1,1 +1,3 @@
 three_finger/envs/data
+__pycache__
+*.tar.gz
